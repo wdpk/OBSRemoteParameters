@@ -145,6 +145,28 @@ $OBStimedSource("<source>", "<mode>", "<delay>", "<scene>")
     containing containing single (') or double (") quotes for this parameter.
 
 
+SET VOLUME OF SOURCE
+===============================================================================
+
+$OBSvolumeSet("<source>", "<volume>")
+
+  # Set the current volume for a given source.
+
+  <source>
+
+    Name of the targeted source to set the visibility of.
+    This is a required argument and cannot be empty. The name has to match the
+    source name in OBS and is therefore case sensitive. All characters can be
+    used except names containing single (') or double (") quotes for this
+    parameter.
+
+  <volume>
+
+    Set the volume on values from 0-100.
+    This is a required argument and cannot be empty and needs to be a valid
+    number to be used. 
+    
+
 STOP STREAMING
 ===============================================================================
 
