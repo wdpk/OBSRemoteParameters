@@ -7,16 +7,18 @@ Parameter library to control OBS within current existing commands!
 
 Version
 
-	1.3.0
-		$OBStimedSource now has an onoff or offon mode and $OBSscene now can accept an optional delay.
-		All parameters now use threading in Python to execute actions.
-	1.2.0
-		Added $OBStimedScene swap to a given scene for a set period of time, then swap to another given scene.
-		Changed script name to _StreamlabsSystem to accomedate the change in the bot name.
-	1.1.0
-		Added $OBStimedSource enabled a given source for a set period of time
-	1.0.0
-		Initial release containing $OBSsource, $OBSscene and $OBSstop
+        1.4.0
+                Added $OBSsetVolume set volume for given source, 1-100
+        1.3.0
+                $OBStimedSource now has an onoff or offon mode and $OBSscene now can accept an optional delay.
+                All parameters now use threading in Python to execute actions.
+        1.2.0
+                Added $OBStimedScene swap to a given scene for a set period of time, then swap to another given scene.
+                Changed script name to _StreamlabsParameter to accomedate the change in the bot name.
+        1.1.0
+                Added $OBStimedSource enabled a given source for a set period of time
+        1.0.0
+                Initial release containing $OBSsource, $OBSscene and $OBSstop
 
 """
 
@@ -39,7 +41,7 @@ ScriptName = "OBS Studio Remote Parameters"
 Website = "http://www.twitch.tv/ocgineer"
 Description = "Parameter Library to control OBS Studio with the regular command system."
 Creator = "Ocgineer"
-Version = "1.3.0"
+Version = "1.4.0"
 
 #---------------------------------------
 # Global Vars
@@ -49,173 +51,200 @@ RegObsScene = None
 RegObsSource = None
 RegObsTmdSrc = None
 RegObsTmdScn = None
+RegObsAudioVolume = None
 
 #---------------------------------------
 # Functions
 #---------------------------------------
 def OpenReadMe():
-	""" Open the script readme file in users default .txt application. """
-	os.startfile(ReadMeFile)
-	return
+        """ Open the script readme file in users default .txt application. """
+        os.startfile(ReadMeFile)
+        return
 
 def CallbackLogger(response):
-	""" Logs callback error response in scripts logger. """
-	parsedresponse = json.loads(response)
-	if parsedresponse["status"] == "error":
-		Parent.Log("OBS Remote", parsedresponse["error"])
-	return
+        """ Logs callback error response in scripts logger. """
+        parsedresponse = json.loads(response)
+        if parsedresponse["status"] == "error":
+                Parent.Log("OBS Remote", parsedresponse["error"])
+        return
 
 def ChangeToScene(scene, delay=None):
-	""" Swaps to a given scene, optionally after given amount of seconds. """
-	if delay:
-		time.sleep(delay)
-	Parent.SetOBSCurrentScene(scene, CallbackLogger)
-	return
+        """ Swaps to a given scene, optionally after given amount of seconds. """
+        if delay:
+                time.sleep(delay)
+        Parent.SetOBSCurrentScene(scene, CallbackLogger)
+        return
 
 def SetSourceVisibility(source, enabled, scene=None):
-	""" Set the targeted source visibility optionally in a scene. """
-	Parent.SetOBSSourceRender(source, enabled, scene, CallbackLogger)
-	return
+        """ Set the targeted source visibility optionally in a scene. """
+        Parent.SetOBSSourceRender(source, enabled, scene, CallbackLogger)
+        return
 
 def ChangeScenesTimed(scene_one, scene_two, delay):
-	""" Swap to one scene then to another scene after a set delay. """
-	Parent.SetOBSCurrentScene(scene_one, CallbackLogger)
-	if delay:
-		time.sleep(delay)
-	Parent.SetOBSCurrentScene(scene_two, CallbackLogger)
-	return
+        """ Swap to one scene then to another scene after a set delay. """
+        Parent.SetOBSCurrentScene(scene_one, CallbackLogger)
+        if delay:
+                time.sleep(delay)
+        Parent.SetOBSCurrentScene(scene_two, CallbackLogger)
+        return
+
+def SetAudioSourceVolume(source, volume):
+        """ Set the targeted source to the volume  """
+        #clip numbers at 100
+        output = 100 if (int(volume) > 100) else volume
+        #Volume function expects value between 0-1, divide by 100 for convenience of using whole numbers in chat commands
+        Parent.SetOBSVolume(source, float(output)/100, CallbackLogger)
+        return
 
 def VisibilitySourceTimed(source, mode, delay, scene):
-	""" Disables a given source in optional scene after given amount of seconds. """
-	# off - delay - off
-	if mode == "offon":
-		Parent.SetOBSSourceRender(source, False, scene, CallbackLogger)
-		if delay:
-			time.sleep(delay)
-		Parent.SetOBSSourceRender(source, True, scene, CallbackLogger)
-	# on - delay - off
-	else:
-		Parent.SetOBSSourceRender(source, True, scene, CallbackLogger)
-		if delay:
-			time.sleep(delay)
-		Parent.SetOBSSourceRender(source, False, scene, CallbackLogger)
-	# done
-	return
+        """ Disables a given source in optional scene after given amount of seconds. """
+        # off - delay - off
+        if mode == "offon":
+                Parent.SetOBSSourceRender(source, False, scene, CallbackLogger)
+                if delay:
+                        time.sleep(delay)
+                Parent.SetOBSSourceRender(source, True, scene, CallbackLogger)
+        # on - delay - off
+        else:
+                Parent.SetOBSSourceRender(source, True, scene, CallbackLogger)
+                if delay:
+                        time.sleep(delay)
+                Parent.SetOBSSourceRender(source, False, scene, CallbackLogger)
+        # done
+        return
 
 #---------------------------------------
 # Initialize data on load
 #---------------------------------------
 def Init():
-	""" Initialize Script. """
+        """ Initialize Script. """
 
-	# Globals
-	global RegObsScene
-	global RegObsSource
-	global RegObsTmdSrc
-	global RegObsTmdScn
+        # Globals
+        global RegObsScene
+        global RegObsSource
+        global RegObsTmdSrc
+        global RegObsTmdScn
+        global RegObsAudioVolume
+        
+        # Compile regexes in init
+        RegObsScene = re.compile(r"(?:\$OBSscene\([\ ]*[\"\'](?P<scene>[^\"\']+)[\"\'][\ ]*(?:\,[\ ]*[\"\'](?P<delay>\d*)[\"\'][\ ]*)?\))", re.U)
+        RegObsSource = re.compile(r"(?P<full>\$OBSsource\([\ ]*[\"\'](?P<source>[^\"\']+)[\"\'][\ ]*\,[\ ]*[\"\'](?P<enabled>[^\"\']*)[\"\'][\ ]*(?:\,[\ ]*[\"\'](?P<scene>[^\"\']*)[\"\'][\ ]*)?\))", re.U)
+        RegObsTmdScn = re.compile(r"(?P<full>\$OBStimedScene\([\ ]*[\"\'](?P<s1>[^\"\']+)[\"\'][\ ]*\,[\ ]*[\"\'](?P<s2>[^\"\']+)[\"\'][\ ]*\,[\ ]*[\"\'](?P<delay>\d+)[\"\'][\ ]*\))", re.U)
+        RegObsTmdSrc = re.compile(r"(?P<full>\$OBStimedSource\([\ ]*[\"\'](?P<source>[^\"\']+)[\"\'][\ ]*\,[\ ]*[\"\'](?P<mode>onoff|offon)[\"\'][\ ]*\,[\ ]*[\"\'](?P<delay>\d+)[\"\'][\ ]*(?:\,[\ ]*[\"\'](?P<scene>[^\"\']*)[\"\'][\ ]*)?\))", re.U)
+        RegObsAudioVolume = re.compile(r"(?P<full>\$OBSvolumeSet\([\ ]*[\"\'](?P<source>[^\"\']+)[\"\'][\ ]*(?:\,[\ ]*[\"\'](?P<volume>\d*)[\"\'][\ ]*)?\))", re.U)
 
-	# Compile regexes in init
-	RegObsScene = re.compile(r"(?:\$OBSscene\([\ ]*[\"\'](?P<scene>[^\"\']+)[\"\'][\ ]*(?:\,[\ ]*[\"\'](?P<delay>\d*)[\"\'][\ ]*)?\))", re.U)
-	RegObsSource = re.compile(r"(?P<full>\$OBSsource\([\ ]*[\"\'](?P<source>[^\"\']+)[\"\'][\ ]*\,[\ ]*[\"\'](?P<enabled>[^\"\']*)[\"\'][\ ]*(?:\,[\ ]*[\"\'](?P<scene>[^\"\']*)[\"\'][\ ]*)?\))", re.U)
-	RegObsTmdScn = re.compile(r"(?P<full>\$OBStimedScene\([\ ]*[\"\'](?P<s1>[^\"\']+)[\"\'][\ ]*\,[\ ]*[\"\'](?P<s2>[^\"\']+)[\"\'][\ ]*\,[\ ]*[\"\'](?P<delay>\d+)[\"\'][\ ]*\))", re.U)
-	RegObsTmdSrc = re.compile(r"(?P<full>\$OBStimedSource\([\ ]*[\"\'](?P<source>[^\"\']+)[\"\'][\ ]*\,[\ ]*[\"\'](?P<mode>onoff|offon)[\"\'][\ ]*\,[\ ]*[\"\'](?P<delay>\d+)[\"\'][\ ]*(?:\,[\ ]*[\"\'](?P<scene>[^\"\']*)[\"\'][\ ]*)?\))", re.U)
-
-	# End of Init
-	return
+        # End of Init
+        return
 
 #---------------------------------------
 # Parse parameters
 #---------------------------------------
 def Parse(parseString, user, target, message):
-	""" Custom Parameter Parser. """
+        """ Custom Parameter Parser. """
 
-	# $OBSscene("scene") parameter
-	# $OBSscene("scene", "delay") parameter
-	if "$OBSscene" in parseString:
+        # $OBSscene("scene") parameter
+        # $OBSscene("scene", "delay") parameter
+        if "$OBSscene" in parseString:
 
-		# Apply regex to verify correct parameter use
-		result = RegObsScene.search(parseString)
-		if result:		
+                # Apply regex to verify correct parameter use
+                result = RegObsScene.search(parseString)
+                if result:              
 
-			# Get results from regex match
-			fullParameterMatch = result.group(0)
-			scene = result.group("scene")
-			delay = int(result.group("delay")) if result.group("delay") else None
+                        # Get results from regex match
+                        fullParameterMatch = result.group(0)
+                        scene = result.group("scene")
+                        delay = int(result.group("delay")) if result.group("delay") else None
 
-			# Change to another scene, using threading
-			threading.Thread(target=ChangeToScene, args=(scene, delay)).start()
+                        # Change to another scene, using threading
+                        threading.Thread(target=ChangeToScene, args=(scene, delay)).start()
 
-			# Replace the whole parameter with an empty string
-			return parseString.replace(fullParameterMatch, "")
+                        # Replace the whole parameter with an empty string
+                        return parseString.replace(fullParameterMatch, "")
 
-	# $OBSsource("source", "enabled")
-	# $OBSsource("source", "enabled", "scene")
-	if "$OBSsource" in parseString:
+        # $OBSsource("source", "enabled")
+        # $OBSsource("source", "enabled", "scene")
+        if "$OBSsource" in parseString:
 
-		# Apply regex to verify correct parameter use
-		result = RegObsSource.search(parseString)
-		if result:
+                # Apply regex to verify correct parameter use
+                result = RegObsSource.search(parseString)
+                if result:
 
-			# Get match groups from regex
-			fullParameterMatch = result.group(0)
-			source = result.group("source")
-			enabled = False if result.group("enabled").lower() == "false" else True
-			scene = result.group("scene") if result.group("scene") else None
+                        # Get match groups from regex
+                        fullParameterMatch = result.group(0)
+                        source = result.group("source")
+                        enabled = False if result.group("enabled").lower() == "false" else True
+                        scene = result.group("scene") if result.group("scene") else None
 
-			# Set source visibility, using threading
-			threading.Thread(target=SetSourceVisibility, args=(source, enabled, scene)).start()		
+                        # Set source visibility, using threading
+                        threading.Thread(target=SetSourceVisibility, args=(source, enabled, scene)).start()             
 
-			# Replace the whole parameter with an empty string
-			return parseString.replace(fullParameterMatch, "")
+                        # Replace the whole parameter with an empty string
+                        return parseString.replace(fullParameterMatch, "")
 
-	# #OBStimedScene("scene_one", "scene_two", "delay")
-	if "$OBStimedScene" in parseString:
+        # #OBStimedScene("scene_one", "scene_two", "delay")
+        if "$OBStimedScene" in parseString:
 
-		# Apply regext to verify correct parameter use
-		result = RegObsTmdScn.search(parseString)
-		if result:
+                # Apply regext to verify correct parameter use
+                result = RegObsTmdScn.search(parseString)
+                if result:
 
-			# Get match groups from regex
-			fullParameterMatch = result.group(0)
-			scene1 = result.group("s1")
-			scene2 = result.group("s2")
-			delay = int(result.group("delay")) if result.group("delay") else None
+                        # Get match groups from regex
+                        fullParameterMatch = result.group(0)
+                        scene1 = result.group("s1")
+                        scene2 = result.group("s2")
+                        delay = int(result.group("delay")) if result.group("delay") else None
 
-			# Change to scene one, then to two after set delay, using threading
-			threading.Thread(target=ChangeScenesTimed, args=(scene1, scene2, delay)).start()
+                        # Change to scene one, then to two after set delay, using threading
+                        threading.Thread(target=ChangeScenesTimed, args=(scene1, scene2, delay)).start()
 
-			# Replace the whole parameter with an empty string
-			return parseString.replace(fullParameterMatch, "")
+                        # Replace the whole parameter with an empty string
+                        return parseString.replace(fullParameterMatch, "")
 
-	# $OBStimedSource("source", "mode", "delay")
-	# $OBStimedSource("source", "mode", "delay", "scene")
-	if "$OBStimedSource" in parseString:
+        # $OBStimedSource("source", "mode", "delay")
+        # $OBStimedSource("source", "mode", "delay", "scene")
+        if "$OBStimedSource" in parseString:
 
-		# Apply regex to verify correct parameter use
-		result = RegObsTmdSrc.search(parseString)
-		if result:
+                # Apply regex to verify correct parameter use
+                result = RegObsTmdSrc.search(parseString)
+                if result:
 
-			# Get match groups from regex
-			fullParameterMatch = result.group(0)
-			source = result.group("source")
-			mode = result.group("mode")
-			delay = int(result.group("delay")) if result.group("delay") else None
-			scene = result.group("scene") if result.group("scene") else None
+                        # Get match groups from regex
+                        fullParameterMatch = result.group(0)
+                        source = result.group("source")
+                        mode = result.group("mode")
+                        delay = int(result.group("delay")) if result.group("delay") else None
+                        scene = result.group("scene") if result.group("scene") else None
 
-			# Start a new thread to disable the source again after amount of given seconds
-			threading.Thread(target=VisibilitySourceTimed, args=(source, mode, delay, scene)).start()
+                        # Start a new thread to disable the source again after amount of given seconds
+                        threading.Thread(target=VisibilitySourceTimed, args=(source, mode, delay, scene)).start()
 
-			# Replace the whole parameter with an empty string
-			return parseString.replace(fullParameterMatch, "")
+                        # Replace the whole parameter with an empty string
+                        return parseString.replace(fullParameterMatch, "")
 
-	# $OBSstop parameter
-	if "$OBSstop" in parseString:
+        # $OBSvolumeSet("source", "volume")
+        if "$OBSvolumeSet" in parseString:
 
-		# Call Stop streaming
-		Parent.StopOBSStreaming(CallbackLogger)
+                # Apply regex to verify correct parameter use
+                result = RegObsAudioVolume.search(parseString)
+                if result:
 
-		# Replace the whole parameter with an empty string
-		return parseString.replace("$OBSstop", "")
+                        # Get match groups from regex
+                        fullParameterMatch = result.group(0)
+                        source = result.group("source")
+                        volume = result.group("volume")
+                        # Set source visibility, using threading
+                        threading.Thread(target=SetAudioSourceVolume, args=(source, volume)).start()            
+                        # Replace the whole parameter with an empty string
+                        return parseString.replace(fullParameterMatch, "")
 
-	# Return unaltered parseString
-	return parseString
+        # $OBSstop parameter
+        if "$OBSstop" in parseString:
+
+                # Call Stop streaming
+                Parent.StopOBSStreaming(CallbackLogger)
+
+                # Replace the whole parameter with an empty string
+                return parseString.replace("$OBSstop", "")
+
+        # Return unaltered parseString
+        return parseString
