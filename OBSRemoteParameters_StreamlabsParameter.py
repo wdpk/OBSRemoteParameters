@@ -148,7 +148,7 @@ def Parse(parseString, user, target, message):
 
 		# Apply regex to verify correct parameter use
 		result = RegObsScene.search(parseString)
-		if result:              
+		if result:
 
 			# Get results from regex match
 			fullParameterMatch = result.group(0)
@@ -176,7 +176,7 @@ def Parse(parseString, user, target, message):
 			scene = result.group("scene") if result.group("scene") else None
 
 			# Set source visibility, using threading
-			threading.Thread(target=SetSourceVisibility, args=(source, enabled, scene)).start()             
+			threading.Thread(target=SetSourceVisibility, args=(source, enabled, scene)).start()
 
 			# Replace the whole parameter with an empty string
 			return parseString.replace(fullParameterMatch, "")
@@ -233,7 +233,7 @@ def Parse(parseString, user, target, message):
 			source = result.group("source")
 			volume = result.group("volume")
 			# Set source visibility, using threading
-			threading.Thread(target=SetAudioSourceVolume, args=(source, volume)).start()            
+			threading.Thread(target=SetAudioSourceVolume, args=(source, volume)).start()
 			# Replace the whole parameter with an empty string
 			return parseString.replace(fullParameterMatch, "")
 
